@@ -1,19 +1,33 @@
-name: Docker Runtime Test
+name: Build and Deploy to Synology
 
-on: [push, workflow_dispatch] # Run on every push or manual trigger
+on:
+  push:
+    branches: [ main ]
 
 jobs:
-  test-container:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run a test container
+      - name: Build Project inside Docker
         run: |
-          docker run --name test-container hello-world
-          
-      - name: Verify Container Output
-        run: |
-          # This checks if the container ran successfully by looking for a specific string
-          docker logs test-container | grep "Hello from Docker!"
+          # Build your app inside a container
+          docker build -t my-project-builder .
+          # Create a temporary container to extract files
+          docker create --name tmp-container my-project-builder
+          # Copy the finished website files out to the runner
+          docker cp tmp-container:/app/dist ./web-files
+          docker rm tmp-container
+
+      - name: Deploy to Synology via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_PASSWORD }}
+          port: 22
+          source: "./web-files/*"
+          target: "/volume1/web/my-project"
+          strip_components: 1
