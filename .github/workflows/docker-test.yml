@@ -1,33 +1,24 @@
-name: Build and Deploy to Synology
-
+name: Docker Build and Deploy
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build Project inside Docker
+      - name: Build inside Docker
         run: |
-          # Build your app inside a container
-          docker build -t my-project-builder .
-          # Create a temporary container to extract files
-          docker create --name tmp-container my-project-builder
-          # Copy the finished website files out to the runner
-          docker cp tmp-container:/app/dist ./web-files
-          docker rm tmp-container
-
-      - name: Deploy to Synology via SCP
-        uses: appleboy/scp-action@master
+          # 1. Build your image
+          docker build -t graduation-app .
+          # 2. Extract the files from the container
+          docker cp $(docker create graduation-app):/app/dist ./output-files
+          
+      - name: Push to Deploy Branch
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          host: ${{ secrets.NAS_HOST }}
-          username: ${{ secrets.NAS_USER }}
-          password: ${{ secrets.NAS_PASSWORD }}
-          port: 22
-          source: "./web-files/*"
-          target: "/volume1/web/my-project"
-          strip_components: 1
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output-files
+          publish_branch: deploy  # This branch will only contain the finished website
